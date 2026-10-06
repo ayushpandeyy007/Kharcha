@@ -10,6 +10,12 @@ final class Store {
     private(set) var loans: [Loan] = []                 // newest first
     private(set) var wallets: [Wallet] = []
     private(set) var transfers: [Transfer] = []         // newest first
+    private(set) var trades: [Trade] = []               // newest first
+    private(set) var quotes: [String: Quote] = [:]
+    private(set) var quotesCheckedAt: Date?
+    private(set) var realisedBefore: Decimal = 0
+    private(set) var days: [DayRecord] = []            // oldest first
+    var priceStatus: PriceStatus = .idle
     private(set) var loadProblem: String?
 
     @ObservationIgnored let dataURL: URL
@@ -183,6 +189,10 @@ final class Store {
             visit(x.fromWalletID, x.date, -d(x.amount))
             visit(x.toWalletID, x.date, d(x.amount))
         }
+        for t in trades {
+            let total = d(t.shares * t.price)
+            visit(t.walletID, t.date, t.side == .buy ? -total : total)
+        }
     }
 
     /// Each wallet's balance right now: its opening amount plus every flow dated between the
@@ -241,6 +251,7 @@ final class Store {
         transactions.filter { $0.walletID == id }.count
             + loans.filter { $0.walletID == id }.count
             + transfers.filter { $0.fromWalletID == id || $0.toWalletID == id }.count
+            + trades.filter { $0.walletID == id }.count
     }
 
     /// Past entries keep their history (and still count in analytics) but no longer belong to a wallet.
@@ -256,6 +267,7 @@ final class Store {
             }
         }
         transfers.removeAll { $0.fromWalletID == id || $0.toWalletID == id }
+        for i in trades.indices where trades[i].walletID == id { trades[i].walletID = nil }
         save()
     }
 
@@ -278,6 +290,76 @@ final class Store {
         return removed
     }
 
+    // MARK: Stocks
+
+    func addTrade(_ trade: Trade) {
+        trades.append(trade)
+        trades.sort { $0.date > $1.date }
+        save()
+    }
+
+    func updateTrade(_ trade: Trade) {
+        guard let i = trades.firstIndex(where: { $0.id == trade.id }) else { return }
+        trades[i] = trade
+        trades.sort { $0.date > $1.date }
+        save()
+    }
+
+    @discardableResult
+    func deleteTrades(_ ids: Set<UUID>) -> [Trade] {
+        let removed = trades.filter { ids.contains($0.id) }
+        trades.removeAll { ids.contains($0.id) }
+        save()
+        return removed
+    }
+
+    func restoreTrades(_ removed: [Trade]) {
+        trades.append(contentsOf: removed)
+        trades.sort { $0.date > $1.date }
+        save()
+    }
+
+    func setRealisedBefore(_ amount: Decimal) {
+        realisedBefore = amount
+        save()
+    }
+
+    /// Prices from the market feed, merged over the old ones (symbols missing today keep their last price).
+    func applyQuotes(_ fresh: [String: Quote], checkedAt: Date) {
+        quotes.merge(fresh) { _, new in new }
+        quotesCheckedAt = checkedAt
+        recordDay(from: fresh)
+        save()
+    }
+
+    /// Saves the trading day's close of everything you hold. Fetching again on the same day replaces it.
+    /// A holding missing from that day's prices (e.g. it didn't trade) keeps its last price, unchanged.
+    private func recordDay(from fresh: [String: Quote]) {
+        let cal = Calendar.current
+        guard let date = fresh.values.map(\.asOf).max() else { return }
+        let held = PortfolioSummary(trades: trades, quotes: quotes, realisedBefore: 0).holdings
+        let positions: [DayRecord.Position] = held.compactMap { h in
+            guard let q = h.quote else { return nil }
+            let tradedThatDay = fresh[h.symbol] != nil && cal.isDate(q.asOf, inSameDayAs: date)
+            return DayRecord.Position(symbol: h.symbol, shares: Decimal(h.shares), cost: Decimal(h.cost),
+                                      close: q.close, previousClose: tradedThatDay ? q.previousClose : q.close)
+        }
+        guard !positions.isEmpty else { return }
+        days.removeAll { cal.isDate($0.date, inSameDayAs: date) }
+        days.append(DayRecord(date: date, positions: positions))
+        days.sort { $0.date < $1.date }
+    }
+
+    /// A price typed in by hand, for when the feed is down or a symbol isn't listed.
+    func setPrice(_ symbol: String, close: Decimal) {
+        var quote = quotes[symbol] ?? Quote(close: close, previousClose: close, asOf: .now)
+        quote.previousClose = quotes[symbol]?.close ?? close
+        quote.close = close
+        quote.asOf = .now
+        quotes[symbol] = quote
+        save()
+    }
+
     /// Whole seconds, rounded up: the data file stores whole seconds, so this keeps "what counts
     /// after the balance was set" identical before and after a relaunch.
     private static func anchorDate() -> Date {
@@ -293,7 +375,9 @@ final class Store {
     // MARK: Persistence
 
     private var snapshot: Snapshot {
-        Snapshot(categories: categories, transactions: transactions, loans: loans, wallets: wallets, transfers: transfers)
+        Snapshot(categories: categories, transactions: transactions, loans: loans, wallets: wallets, transfers: transfers,
+                 trades: trades, quotes: quotes, quotesCheckedAt: quotesCheckedAt, realisedBefore: realisedBefore,
+                 days: days)
     }
 
     private func sortLoansAndSave() {
@@ -318,6 +402,11 @@ final class Store {
             transactions = snapshot.transactions.sorted { $0.date > $1.date }
             loans = snapshot.loans.sorted { $0.date > $1.date }
             transfers = snapshot.transfers.sorted { $0.date > $1.date }
+            trades = snapshot.trades.sorted { $0.date > $1.date }
+            quotes = snapshot.quotes
+            quotesCheckedAt = snapshot.quotesCheckedAt
+            realisedBefore = snapshot.realisedBefore
+            days = snapshot.days.sorted { $0.date < $1.date }
             for fallback in Category.defaults where fallback.isFallback && !categories.contains(where: { $0.id == fallback.id }) {
                 categories.append(fallback)
             }

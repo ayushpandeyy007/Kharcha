@@ -151,6 +151,63 @@ struct Transfer: Identifiable, Codable, Hashable {
     var note: String = ""
 }
 
+/// One buy or sell of NEPSE shares. Holdings, average cost and realised gain are worked out from these.
+struct Trade: Identifiable, Codable, Hashable {
+    enum Side: String, Codable, CaseIterable, Identifiable {
+        case buy, sell
+        var id: Self { self }
+        var title: String { self == .buy ? "Buy" : "Sell" }
+    }
+
+    var id = UUID()
+    var symbol: String          // uppercased NEPSE symbol, e.g. "NABIL"
+    var side: Side
+    var shares: Decimal
+    var price: Decimal          // per share; buys include charges, sells are after charges
+    var date: Date
+    var walletID: UUID?         // nil = no wallet involved (e.g. shares you already owned)
+    var note: String = ""
+}
+
+/// End-of-day price for one symbol, plus the longer-range figures shown on the analysis board.
+struct Quote: Codable, Hashable {
+    var close: Decimal
+    var previousClose: Decimal
+    var asOf: Date              // trading day the prices are for
+    var high52: Decimal?        // 52-week high / low
+    var low52: Decimal?
+    var avg120: Decimal?        // average price over 120 / 180 days
+    var avg180: Decimal?
+    var open: Decimal?          // the trading day's open, high, low and volume
+    var high: Decimal?
+    var low: Decimal?
+    var volume: Decimal?
+}
+
+/// What your portfolio looked like at the close of one trading day, saved each time you fetch prices.
+struct DayRecord: Codable, Hashable, Identifiable {
+    struct Position: Codable, Hashable {
+        var symbol: String
+        var shares: Decimal
+        var cost: Decimal
+        var close: Decimal
+        var previousClose: Decimal
+    }
+
+    var date: Date              // the trading day (prices' "as of")
+    var positions: [Position]
+    var id: Date { date }
+
+    private func sum(_ f: (Position) -> Decimal) -> Double {
+        NSDecimalNumber(decimal: positions.reduce(Decimal.zero) { $0 + f($1) }).doubleValue
+    }
+    var value: Double { sum { $0.shares * $0.close } }
+    var previousValue: Double { sum { $0.shares * $0.previousClose } }
+    var cost: Double { sum { $0.cost } }
+    var dayGain: Double { value - previousValue }
+    var dayPercent: Double? { previousValue > 0 ? dayGain / previousValue : nil }
+}
+
 /// v3 stored a single account balance; v4 moves it into the "Bank account" wallet.
 struct BalanceAnchor: Codable, Hashable {
     var amount: Decimal
@@ -158,24 +215,36 @@ struct BalanceAnchor: Codable, Hashable {
 }
 
 struct Snapshot: Codable {
-    var version = 4
+    var version = 6
     var categories: [Category]
     var transactions: [Transaction]
     var loans: [Loan] = []
     var wallets: [Wallet]?          // nil only in files from before wallets existed
     var transfers: [Transfer] = []
+    var trades: [Trade] = []
+    var quotes: [String: Quote] = [:]
+    var quotesCheckedAt: Date?
+    var realisedBefore: Decimal = 0 // realised gain from sales made before using Kharcha
+    var days: [DayRecord] = []      // portfolio at each fetched close, oldest first
     var balance: BalanceAnchor?     // legacy (v3), read for migration only
 
     init(categories: [Category], transactions: [Transaction], loans: [Loan] = [],
-         wallets: [Wallet]? = nil, transfers: [Transfer] = []) {
+         wallets: [Wallet]? = nil, transfers: [Transfer] = [], trades: [Trade] = [],
+         quotes: [String: Quote] = [:], quotesCheckedAt: Date? = nil, realisedBefore: Decimal = 0,
+         days: [DayRecord] = []) {
         self.categories = categories
         self.transactions = transactions
         self.loans = loans
         self.wallets = wallets
         self.transfers = transfers
+        self.trades = trades
+        self.quotes = quotes
+        self.quotesCheckedAt = quotesCheckedAt
+        self.realisedBefore = realisedBefore
+        self.days = days
     }
 
-    // Older files lack "loans" (v1), "balance" (v1–2), "wallets"/"transfers" (v1–3).
+    // Older files lack "loans" (v1), "balance" (v1–2), "wallets"/"transfers" (v1–3), stocks (v1–4), days (v1–5).
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         version = try c.decodeIfPresent(Int.self, forKey: .version) ?? 1
@@ -184,6 +253,11 @@ struct Snapshot: Codable {
         loans = try c.decodeIfPresent([Loan].self, forKey: .loans) ?? []
         wallets = try c.decodeIfPresent([Wallet].self, forKey: .wallets)
         transfers = try c.decodeIfPresent([Transfer].self, forKey: .transfers) ?? []
+        trades = try c.decodeIfPresent([Trade].self, forKey: .trades) ?? []
+        quotes = try c.decodeIfPresent([String: Quote].self, forKey: .quotes) ?? [:]
+        quotesCheckedAt = try c.decodeIfPresent(Date.self, forKey: .quotesCheckedAt)
+        realisedBefore = try c.decodeIfPresent(Decimal.self, forKey: .realisedBefore) ?? 0
+        days = try c.decodeIfPresent([DayRecord].self, forKey: .days) ?? []
         balance = try c.decodeIfPresent(BalanceAnchor.self, forKey: .balance)
     }
 }

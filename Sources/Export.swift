@@ -12,6 +12,21 @@ enum Exporter {
         save(loansCSV(store), name: "Kharcha Loans \(day(.now)).csv", type: .commaSeparatedText)
     }
 
+    static func exportPortfolio(_ store: Store) {
+        save(portfolioCSV(store), name: "Kharcha Portfolio \(day(.now)).csv", type: .commaSeparatedText)
+    }
+
+    static func portfolioCSV(_ store: Store) -> Data {
+        func n(_ x: Double) -> String { String(format: "%.2f", x) }
+        var rows = [["Symbol", "Shares", "Avg Cost", "Cost Basis", "Latest Close", "Prev Close", "Market Value",
+                     "Unrealised", "Day's Gain", "Price Date"]]
+        for h in store.portfolio.holdings {
+            rows.append([h.symbol, n(h.shares), n(h.avgCost), n(h.cost), h.close.map(n) ?? "", h.previousClose.map(n) ?? "",
+                         n(h.marketValue), n(h.unrealised), n(h.dayGain), h.quote.map { day($0.asOf) } ?? ""])
+        }
+        return csv(rows)
+    }
+
     static func exportBackup(_ store: Store) {
         do {
             save(try store.backupData(), name: "Kharcha Backup \(day(.now)).json", type: .json)

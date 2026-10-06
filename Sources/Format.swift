@@ -18,10 +18,23 @@ enum Money {
         return f
     }()
 
-    /// "Rs 12,34,567" / "−Rs 500"
+    /// "Rs 12,34,567" / "−Rs 500" / "Rs 22,608.90" (paisa shown with two digits, whole rupees without)
     static func string(_ value: Double) -> String {
-        let digits = grouped.string(from: NSNumber(value: abs(value))) ?? "0"
-        return (value < 0 ? "−" : "") + symbol + " " + digits
+        let a = abs(value)
+        let digits = (a - a.rounded()).magnitude < 0.005
+            ? grouped.string(from: NSNumber(value: a.rounded())) ?? "0"
+            : plain(a)
+        return (value < -0.004 ? "−" : "") + symbol + " " + digits
+    }
+
+    /// Without the symbol and with fixed decimals, for tables: "2,310.50", "−6,923.00".
+    static func plain(_ value: Double, decimals: Int = 2) -> String {
+        let f = NumberFormatter()
+        f.locale = Locale(identifier: "en_IN")
+        f.numberStyle = .decimal
+        f.minimumFractionDigits = decimals
+        f.maximumFractionDigits = decimals
+        return (value < -0.0000001 ? "−" : "") + (f.string(from: NSNumber(value: abs(value))) ?? "0")
     }
 
     static func string(_ value: Decimal) -> String {

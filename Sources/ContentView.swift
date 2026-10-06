@@ -21,6 +21,7 @@ struct ContentView: View {
                 case .overview: OverviewView()
                 case .transactions: TransactionsView()
                 case .wallets: WalletsView()
+                case .portfolio: PortfolioView()
                 case .loans: LoansView()
                 case .analytics: AnalyticsView()
                 }
@@ -31,7 +32,10 @@ struct ContentView: View {
             .navigationTitle(ui.section.title)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    if ui.section == .wallets {
+                    if ui.section == .portfolio {
+                        Button { ui.portfolioSheet = .trade(symbol: nil, side: .buy) } label: { Label("Add Stock", systemImage: "plus") }
+                            .help("Add shares you bought")
+                    } else if ui.section == .wallets {
                         Button { ui.walletSheet = .new } label: { Label("Add Wallet", systemImage: "plus") }
                             .help("Add a wallet")
                     } else if ui.section == .loans {
@@ -69,6 +73,17 @@ struct ContentView: View {
             }
             .padding(20)
             .frame(width: 500)
+        }
+        .sheet(item: $ui.portfolioSheet) { sheet in
+            Group {
+                switch sheet {
+                case .trade(let symbol, let side): TradeForm(symbol: symbol, side: side) { ui.portfolioSheet = nil }
+                case .detail(let symbol): HoldingDetail(symbol: symbol) { ui.portfolioSheet = nil }
+                case .realisedBefore: RealisedBeforeEditor { ui.portfolioSheet = nil }
+                }
+            }
+            .padding(20)
+            .frame(width: 520)
         }
         .alert("Data file problem", isPresented: .constant(store.loadProblem != nil && !problemAcknowledged)) {
             Button("OK") { problemAcknowledged = true }

@@ -20,6 +20,7 @@ private struct GeneralSettings: View {
             TextField("Currency symbol", text: $symbol, prompt: Text("Rs"))
             LabeledContent("Preview", value: Money.string(Double(125000)))
             Toggle("Show this month's spending in the menu bar", isOn: $menuBarShowsTotal)
+
             SwiftUI.Section("Export") {
                 LabeledContent("Spreadsheet (CSV)") {
                     HStack {

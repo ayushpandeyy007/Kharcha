@@ -7,8 +7,8 @@
 <p align="center">
   <b>The budget tracker made for Nepal.</b> A free, native Mac app.<br>
   आफ्नो खर्चको हिसाब राख्नुहोस्, सजिलै।<br><br>
-  Rupees with lakh grouping · eSewa, Khalti, bank and cash wallets · loans to friends · real analytics<br>
-  Pure Swift + SwiftUI · no account · no internet · your data never leaves your Mac
+  Rupees with lakh grouping · eSewa, Khalti, bank and cash wallets · loans to friends · NEPSE portfolio · real analytics<br>
+  Pure Swift + SwiftUI · no account · your data never leaves your Mac
 </p>
 
 <p align="center">
@@ -29,6 +29,7 @@ Most budget apps are built for dollars and credit cards. Kharcha is built for ho
 - **Your real wallets.** Bank account, cash in hand, **eSewa**, **Khalti**, or any you add. Each balance updates as you spend, and **Move Money** handles ATM withdrawals and wallet top-ups without counting them as spending.
 - **सापटी (lending), tracked.** Record money you lent to a friend or borrowed from family. Log partial repayments as they come in, set due dates, and see who's overdue.
 - **Fast, everyday logging.** Momo for Rs 180 from cash? Three clicks, or straight from the **menu bar**. Notes remember their category, and the amount field adds up `120+80` for you.
+- **Your NEPSE shares.** Track holdings, average cost, day's gain, unrealised and realised gain, and fetch the latest closing prices with one click.
 - **Private by design.** No sign-up, no cloud, no ads. Everything stays in one file on your Mac.
 
 ## Features
@@ -41,6 +42,9 @@ Most budget apps are built for dollars and credit cards. Kharcha is built for ho
 - **Overview**: total balance across wallets, this month's spending and income, today's spending, spending pace vs. last month, top categories, recent entries.
 - **Wallets**: per-wallet balances, money in and out this month, transfers between wallets, add/rename/recolor your own.
 - **Loans**: lent and borrowed, partial repayments into any wallet, due dates, overdue warnings, settled history.
+- **Portfolio**: NEPSE holdings with latest close, average cost, cost basis, unrealised and day's gain, realised and overall gain. Buy and sell with weighted-average cost, paid from or into any wallet. Click **Fetch Prices** to get the latest closing prices.
+- **Daily history**: every Fetch Prices saves that trading day. See your portfolio's value by day, each day's gain or loss, best and worst days, and how each stock moved.
+- **Stock analysis board**: facts about each holding (today's open, high, low and volume, share of your portfolio, break-even price, where it sits in its 52-week range, how it compares to its 120- and 180-day averages). It shows facts, not buy or sell advice.
 - **Analytics** for this month, last month, 3 months or this year:
   - Spending by category (ring + ranked bars)
   - Daily spending heatmap
@@ -88,13 +92,16 @@ Other options: `./build.sh` only builds into `build/`, and `./build.sh release` 
 | ⌘N / ⇧⌘N | New expense / new income |
 | ⌘L | New loan |
 | ⌘T | Move money between wallets |
-| ⌘1 – ⌘5 | Overview, Transactions, Wallets, Loans, Analytics |
+| ⌘B | Add stock |
+| ⌘1 – ⌘6 | Overview, Transactions, Wallets, Portfolio, Loans, Analytics |
 | ⇧⌘E | Export transactions as CSV |
 | ⌫ / ⌘Z | Delete selected / undo |
 
 ## Your data
 
 Everything is stored locally in one JSON file at `~/Library/Application Support/Kharcha/data.json`. A backup copy (`data.backup.json`) is refreshed on every launch. Nothing is sent anywhere.
+
+Kharcha only goes online when you click **Fetch Prices**. It then downloads the public "Today's Share Price" page from sharesansar.com, which covers the whole market, so nothing about which shares you own is sent.
 
 Settings → General has **Show in Finder** and the export buttons. The currency symbol can be changed there too.
 
@@ -108,12 +115,14 @@ Settings → General has **Show in Finder** and the export buttons. The currency
 | `Sources/Charts.swift` | Pace, trend, category ring and heatmap charts |
 | `Sources/*View.swift` | Overview, Transactions, Wallets, Loans, Analytics, Settings, menu bar |
 | `Sources/EntryForm.swift` | Add/edit form shared by the window and the menu bar |
+| `Sources/Portfolio.swift` | Holdings, gains, and the NEPSE price reader |
+| `Sources/StockAnalysis.swift` | The stock analysis board |
 | `Sources/Export.swift` | CSV and backup export |
 | `scripts/make_icon.swift` | Renders the app icon |
 | `scripts/demo-data/` | Generates sample data (`KHARCHA_DATA_DIR=<dir>` points the app at it). The screenshots use this. |
 | `build.sh` | Compiles a universal, ad-hoc signed `.app` bundle |
 
-eSewa and Khalti are trademarks of their respective owners. Kharcha is an independent app and isn't affiliated with them; it simply lets you keep track of what's in those wallets.
+eSewa, Khalti and Sharesansar are trademarks of their respective owners. Kharcha is an independent app and isn't affiliated with them. Share prices are for your own tracking and may be delayed or wrong; check them before acting on them.
 
 ## License
 

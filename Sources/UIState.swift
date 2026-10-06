@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum Section: String, CaseIterable, Identifiable {
-    case overview, transactions, wallets, loans, analytics
+    case overview, transactions, wallets, portfolio, loans, analytics
 
     var id: Self { self }
     var title: String { rawValue.capitalized }
@@ -10,6 +10,7 @@ enum Section: String, CaseIterable, Identifiable {
         case .overview: "square.grid.2x2"
         case .transactions: "list.bullet.rectangle"
         case .wallets: "wallet.pass"
+        case .portfolio: "chart.line.uptrend.xyaxis"
         case .loans: "person.2"
         case .analytics: "chart.xyaxis.line"
         }
@@ -20,6 +21,20 @@ struct EditorTarget: Identifiable {
     let id = UUID()
     var transaction: Transaction?
     var kind: Kind = .expense
+}
+
+enum PortfolioSheet: Identifiable {
+    case trade(symbol: String?, side: Trade.Side)
+    case detail(String)
+    case realisedBefore
+
+    var id: String {
+        switch self {
+        case .trade(let symbol, let side): "trade-\(symbol ?? "")-\(side.rawValue)"
+        case .detail(let symbol): "detail-\(symbol)"
+        case .realisedBefore: "realised"
+        }
+    }
 }
 
 enum WalletSheet: Identifiable {
@@ -56,4 +71,5 @@ final class UIState {
     var editor: EditorTarget?
     var loanSheet: LoanSheet?
     var walletSheet: WalletSheet?
+    var portfolioSheet: PortfolioSheet?
 }

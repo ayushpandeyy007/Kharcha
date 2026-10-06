@@ -48,12 +48,17 @@ private struct AppCommands: Commands {
                 ui.section = .wallets
                 ui.walletSheet = .transfer
             }
+            OpenWindowButton(title: "Add Stock…", key: "b", modifiers: .command) {
+                ui.section = .portfolio
+                ui.portfolioSheet = .trade(symbol: nil, side: .buy)
+            }
         }
         CommandGroup(replacing: .importExport) {
             Menu("Export") {
                 Button("Transactions as CSV…") { Exporter.exportTransactions(store) }
                     .keyboardShortcut("e", modifiers: [.command, .shift])
                 Button("Loans as CSV…") { Exporter.exportLoans(store) }
+                Button("Portfolio as CSV…") { Exporter.exportPortfolio(store) }
                 Divider()
                 Button("Full Backup…") { Exporter.exportBackup(store) }
             }

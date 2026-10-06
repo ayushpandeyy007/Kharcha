@@ -45,6 +45,7 @@ struct OverviewView: View {
                     .frame(width: 320)
                 }
                 .fixedSize(horizontal: false, vertical: true)
+                if !store.portfolio.isEmpty { portfolio }
                 if store.loans.contains(where: { !$0.isSettled }) { loans }
                 recent
             }
@@ -76,6 +77,35 @@ struct OverviewView: View {
         guard let projected = report.projected else { return "Cumulative spending this month" }
         let end = Calendar.current.adding(days: report.range.totalDays - 1, to: report.range.full.start)
         return "On pace for \(Money.string(projected.rounded())) by \(end.formatted(.dateTime.month(.abbreviated).day()))"
+    }
+
+    private var portfolio: some View {
+        let p = store.portfolio
+        func signed(_ v: Double) -> String { (v > 0.005 ? "+" : "") + Money.string(v) }
+        return HStack(spacing: 28) {
+            Label("Portfolio", systemImage: "chart.line.uptrend.xyaxis").font(.headline)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Market value").font(.caption).foregroundStyle(.secondary)
+                Text(Money.string(p.marketValue)).fontWeight(.semibold).monospacedDigit()
+            }
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Today").font(.caption).foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    Text(signed(p.dayGain)).fontWeight(.semibold).monospacedDigit()
+                    GainPercent(value: p.dayGain, percent: p.dayPercent)
+                }
+            }
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Unrealised").font(.caption).foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    Text(signed(p.unrealised)).fontWeight(.semibold).monospacedDigit()
+                    GainPercent(value: p.unrealised, percent: p.unrealisedPercent)
+                }
+            }
+            Spacer()
+            Button("View portfolio") { ui.section = .portfolio }.buttonStyle(.link)
+        }
+        .card(padding: 14)
     }
 
     private var loans: some View {

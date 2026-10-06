@@ -334,11 +334,30 @@ struct WalletPicker: View {
     var balances: [UUID: Double]? = nil
     var excluding: UUID? = nil
     var compact = false
+    var noneLabel: String? = nil      // offer "no wallet" (selection nil) when set
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(title).font(.caption).foregroundStyle(.secondary)
             LazyVGrid(columns: [GridItem(.adaptive(minimum: compact ? 72 : 100), spacing: 6)], spacing: 6) {
+                if let noneLabel {
+                    Button { selection = nil } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "minus.circle").foregroundStyle(.secondary)
+                            Text(noneLabel).lineLimit(1)
+                        }
+                        .font(.caption)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, 7)
+                        .background(selection == nil ? Palette.well : Color.clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .strokeBorder(selection == nil ? Palette.axis : Palette.hairline, lineWidth: selection == nil ? 1.5 : 1))
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Don't take this from or put it into any wallet")
+                }
                 ForEach(store.wallets.filter { $0.id != excluding }) { w in
                     let tint = Palette.color(w.color)
                     let selected = w.id == selection
